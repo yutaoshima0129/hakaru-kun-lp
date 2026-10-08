@@ -1,14 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/components/AdminShell";
 import { getAdminBackend, type NewPoster, type PosterPatch, type PosterRecord } from "@/lib/backend";
+import ScheduleEditor from "@/components/ScheduleEditor";
+import { describeSchedule } from "@/lib/schedule";
 import { fileToPosterImage, samplePosters } from "@/lib/samples";
 
 export default function PostersPage() {
   const { storeId } = useStore();
   const [posters, setPosters] = useState<PosterRecord[]>([]);
   const [busy, setBusy] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -101,6 +105,9 @@ export default function PostersPage() {
             変更はサイネージ画面にすぐ反映されます。表示中 {posters.filter((p) => p.enabled).length} 枚、1周 {totalSec} 秒。
           </p>
         </div>
+        <Link href="/admin/posters/new" className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:opacity-90">
+          ポスターを作る
+        </Link>
         <button
           onClick={() => add(samplePosters)}
           disabled={busy}
@@ -111,7 +118,7 @@ export default function PostersPage() {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-          className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:opacity-90 disabled:opacity-50"
+          className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-bold hover:bg-gray-50 disabled:opacity-50"
         >
           {busy ? "読み込み中…" : "画像をアップロード"}
         </button>
@@ -123,10 +130,6 @@ export default function PostersPage() {
           className="hidden"
           onChange={(e) => upload(e.target.files)}
         />
-      </div>
-
-      <div className="text-xs text-gray-500 bg-white border border-dashed border-gray-300 rounded-xl px-4 py-3">
-        AIでのポスター自動生成は第2段階で追加予定です。いまはお手持ちのAIツールで作った画像をアップロードしてください（推奨 1920×1080）。
       </div>
 
       {posters.length === 0 ? (
@@ -179,7 +182,22 @@ export default function PostersPage() {
                       />
                       表示する
                     </label>
+                    <span className="text-xs font-bold bg-gray-100 text-gray-700 rounded-full px-2.5 py-1">
+                      {describeSchedule(p.schedule)}
+                    </span>
+                    <button
+                      onClick={() => setScheduleOpen(scheduleOpen === p.id ? null : p.id)}
+                      aria-expanded={scheduleOpen === p.id}
+                      className="text-xs font-bold text-primary hover:underline"
+                    >
+                      表示時間帯
+                    </button>
                   </div>
+                  {scheduleOpen === p.id && (
+                    <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
+                      <ScheduleEditor value={p.schedule} onChange={(schedule) => update(p, { schedule })} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex sm:flex-col gap-2">
                   <IconButton label="上へ" onClick={() => move(i, -1)} disabled={i === 0}>

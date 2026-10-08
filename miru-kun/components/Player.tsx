@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import {
   AttentionTracker,
@@ -9,6 +9,7 @@ import {
   isLooking,
   type FaceObservation,
 } from "@/lib/attention";
+import { isScheduledAt } from "@/lib/schedule";
 import { DeviceNotPairedError, getPlayerBackend, mode, type DeviceSettings, type Manifest } from "@/lib/backend";
 
 type CameraState = "starting" | "running" | "denied" | "error";
@@ -71,7 +72,13 @@ export default function Player() {
   const lastFacesRef = useRef<FaceObservation[]>([]);
   const debugRef = useRef(false);
 
-  const posters = manifest?.posters ?? [];
+  const [now, setNow] = useState(() => new Date());
+  const allPosters = manifest?.posters;
+  // 曜日・時間帯が合うポスターだけを回す（30秒ごとに再判定）
+  const posters = useMemo(
+    () => (allPosters ?? []).filter((p) => isScheduledAt(p.schedule, now)),
+    [allPosters, now],
+  );
   const settings = manifest?.settings ?? null;
 
   // ---- ポスターと設定の読み込み（管理画面での変更を即時反映） ----
@@ -119,6 +126,10 @@ export default function Player() {
   }, [debug]);
 
   // ---- ポスターのローテーション ----
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
   const current = posters.length > 0 ? posters[index % posters.length] : null;
   useEffect(() => {
     currentPosterIdRef.current = current?.id ?? null;
@@ -126,7 +137,7 @@ export default function Player() {
 
   useEffect(() => {
     if (!current || posters.length < 2) return;
-    const timer = setTimeout(() => setIndex((i) => (i + 1) % posters.length), current.durationSec * 1000);
+    const timer = setTimeout(() => setIndex((i) => (i % posters.length + 1) % posters.length), current.durationSec * 1000);
     return () => clearTimeout(timer);
   }, [current, posters.length]);
 
@@ -291,7 +302,7 @@ export default function Player() {
   return (
     <div className={`fixed inset-0 bg-black overflow-hidden ${debug ? "" : "cursor-none"}`}>
       {/* ポスター（クロスフェード） */}
-      {posters.map((p) => (
+      {(allPosters ?? []).map((p) => (
         // eslint-disable-next-line @next/next/no-img-element -- data URL / Storage URL をそのまま表示する
         <img
           key={p.id}
@@ -302,7 +313,7 @@ export default function Player() {
         />
       ))}
 
-      {posters.length === 0 && (
+      {(allPosters ?? []).length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center text-white/70 text-center p-8">
           <div>
             <div className="text-2xl font-bold">表示するポスターがありません</div>
@@ -373,7 +384,7 @@ export default function Player() {
             <Stat label="注視（起動後）" value={live.viewers} />
           </div>
           <div className="text-xs text-white/70">
-            表示中：{current?.name ?? "なし"} ／ 判定：左右±{settings?.yawThreshold}° 上下±{settings?.pitchThreshold}° を
+            {current ? `表示中：${current.name}` : "表示中：なし（時間外）"} ／ 判定：左右±{settings?.yawThreshold}° 上下±{settings?.pitchThreshold}° を
             {settings?.minLookMs}ms以上 ／ 補正 {settings?.yawOffset}°, {settings?.pitchOffset}°
           </div>
           <button
