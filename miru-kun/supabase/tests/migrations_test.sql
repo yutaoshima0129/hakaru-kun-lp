@@ -170,5 +170,23 @@ select pg_temp.expect_error(
   $q$insert into storage.objects (bucket_id, name) values ('posters', 'not-a-uuid/evil.jpg')$q$,
   '店舗IDでないフォルダには画像を置けない');
 
+-- ---------- 表示スケジュール（0003）----------
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+update public.posters set days = '{1,2,3,4,5}', start_time = '11:00', end_time = '14:00' where name = 'p1';
+select pg_temp.expect_error($q$update public.posters set days = '{7}' where name = 'p1'$q$, '曜日は 0〜6 のみ');
+select pg_temp.expect_error($q$update public.posters set start_time = '10:00', end_time = null where name = 'p1'$q$, '開始と終了は両方指定');
+select pg_temp.as_admin();
+insert into t select 'deviceS', id::text from public.devices limit 1;
+update public.devices set token_hash = extensions.digest('sched-token', 'sha256') where id = (select v::uuid from t where k = 'deviceS');
+select pg_temp.as_anon();
+select pg_temp.ok(
+  (select jsonb_path_query_first(public.device_manifest('sched-token'), '$.posters[*] ? (@.name == "p1")')
+     - 'id' - 'image_path' - 'duration_sec' - 'name')
+  = '{"days": [1, 2, 3, 4, 5], "start_time": "11:00", "end_time": "14:00"}'::jsonb,
+  'マニフェストにスケジュールが入る');
+select pg_temp.ok(
+  (select jsonb_path_query_first(public.device_manifest('sched-token'), '$.posters[*] ? (@.name == "p2")') -> 'start_time') = 'null'::jsonb,
+  '時間帯なしは null');
+
 select pg_temp.as_admin();
 \echo 'all assertions passed'

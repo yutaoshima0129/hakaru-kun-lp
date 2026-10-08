@@ -16,6 +16,7 @@ import {
   subscribe as subscribeLocal,
   type Poster,
 } from "../store";
+import { ALWAYS } from "../schedule";
 import {
   withDefaults,
   type AdminBackend,
@@ -36,6 +37,7 @@ const toRecord = (p: Poster): PosterRecord => ({
   enabled: p.enabled,
   order: p.order,
   createdAt: p.createdAt,
+  schedule: p.schedule ?? ALWAYS,
 });
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -83,6 +85,7 @@ export function createLocalAdminBackend(): AdminBackend {
           enabled: true,
           order: start + i,
           createdAt: now + i,
+          schedule: item.schedule ?? ALWAYS,
         });
       }
       await savePosters(created);
@@ -149,7 +152,13 @@ export function createLocalPlayerBackend(): PlayerBackend {
         storeName: null,
         deviceName: null,
         settings: currentSettings(),
-        posters: posters.map((p) => ({ id: p.id, name: p.name, imageUrl: p.image, durationSec: p.durationSec })),
+        posters: posters.map((p) => ({
+          id: p.id,
+          name: p.name,
+          imageUrl: p.image,
+          durationSec: p.durationSec,
+          schedule: p.schedule ?? ALWAYS,
+        })),
       };
     },
     async reportMetrics(buckets) {

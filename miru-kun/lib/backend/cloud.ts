@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MetricBucket } from "../attention";
+import type { PosterSchedule } from "../schedule";
 import { getSupabase } from "../supabase";
 import {
   DeviceNotPairedError,
@@ -53,7 +54,19 @@ type PosterRow = {
   enabled: boolean;
   sort_order: number;
   created_at: string;
+  days: number[];
+  start_time: string | null;
+  end_time: string | null;
 };
+
+/** DB の time 型（"HH:MM:SS"）→ "HH:MM" */
+const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null);
+const toSchedule = (r: { days: number[] | null; start_time: string | null; end_time: string | null }): PosterSchedule => ({
+  days: r.days ?? [],
+  start: hhmm(r.start_time),
+  end: hhmm(r.end_time),
+});
+const scheduleColumns = (s: PosterSchedule) => ({ days: s.days, start_time: s.start, end_time: s.end });
 
 type DeviceRow = {
   id: string;
@@ -79,6 +92,7 @@ export function createCloudAdminBackend(client: SupabaseClient = getSupabase()):
     enabled: r.enabled,
     order: r.sort_order,
     createdAt: Date.parse(r.created_at),
+    schedule: toSchedule(r),
   });
 
   const toDevice = (r: DeviceRow): DeviceRecord => ({
@@ -122,7 +136,7 @@ export function createCloudAdminBackend(client: SupabaseClient = getSupabase()):
       const rows = unwrap<PosterRow[]>(
         await client
           .from("posters")
-          .select("id,name,image_path,duration_sec,enabled,sort_order,created_at")
+          .select("id,name,image_path,duration_sec,enabled,sort_order,created_at,days,start_time,end_time")
           .eq("store_id", storeId)
           .order("sort_order")
           .order("created_at"),
@@ -148,7 +162,13 @@ export function createCloudAdminBackend(client: SupabaseClient = getSupabase()):
           check(await client.storage.from("posters").upload(path, item.image, { contentType: item.image.type }));
           const ins = await client
             .from("posters")
-            .insert({ store_id: storeId, name: item.name, image_path: path, sort_order: start + i });
+            .insert({
+              store_id: storeId,
+              name: item.name,
+              image_path: path,
+              sort_order: start + i,
+              ...(item.schedule ? scheduleColumns(item.schedule) : {}),
+            });
           if (ins.error) {
             // 孤児ファイルを残さない
             const rm = await client.storage.from("posters").remove([path]);
@@ -168,6 +188,7 @@ export function createCloudAdminBackend(client: SupabaseClient = getSupabase()):
         if (p.durationSec !== undefined) c.duration_sec = p.durationSec;
         if (p.enabled !== undefined) c.enabled = p.enabled;
         if (p.order !== undefined) c.sort_order = p.order;
+        if (p.schedule !== undefined) Object.assign(c, scheduleColumns(p.schedule));
         return c;
       };
       const results = await Promise.all(
@@ -353,7 +374,15 @@ async function outboxDelete(batchId: string): Promise<void> {
 type ManifestJson = {
   device: { id: string; name: string | null; settings: Partial<import("./types").DeviceSettings> | null };
   store: { id: string; name: string | null } | null;
-  posters: { id: string; name: string; image_path: string; duration_sec: number }[];
+  posters: {
+    id: string;
+    name: string;
+    image_path: string;
+    duration_sec: number;
+    days?: number[];
+    start_time?: string | null;
+    end_time?: string | null;
+  }[];
 };
 
 export function createCloudPlayerBackend(client: SupabaseClient = getSupabase()): PlayerBackend {
@@ -427,6 +456,7 @@ export function createCloudPlayerBackend(client: SupabaseClient = getSupabase())
           name: p.name,
           imageUrl: client.storage.from("posters").getPublicUrl(p.image_path).data.publicUrl,
           durationSec: p.duration_sec,
+          schedule: toSchedule({ days: p.days ?? [], start_time: p.start_time ?? null, end_time: p.end_time ?? null }),
         })),
       };
     },

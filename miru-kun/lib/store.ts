@@ -12,6 +12,8 @@ export type Poster = {
   enabled: boolean;
   order: number;
   createdAt: number;
+  /** 未設定（第0段階のデータ）はいつでも表示 */
+  schedule?: import("./schedule").PosterSchedule;
 };
 
 export type StoredMetric = MetricBucket & { key: string; demo?: boolean };

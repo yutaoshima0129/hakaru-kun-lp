@@ -6,6 +6,9 @@
 // 画面側はこのファイルの型だけに依存し、どちらのモードかは `mode` で分岐する。
 
 import type { AttentionSettings, MetricBucket } from "../attention";
+import type { PosterSchedule } from "../schedule";
+
+export type { PosterSchedule } from "../schedule";
 
 export type Mode = "local" | "cloud";
 
@@ -41,11 +44,13 @@ export type PosterRecord = {
   enabled: boolean;
   order: number;
   createdAt: number;
+  /** 表示する曜日・時間帯 */
+  schedule: PosterSchedule;
 };
 
-export type PosterPatch = Partial<Pick<PosterRecord, "name" | "durationSec" | "enabled" | "order">>;
+export type PosterPatch = Partial<Pick<PosterRecord, "name" | "durationSec" | "enabled" | "order" | "schedule">>;
 
-export type NewPoster = { name: string; image: Blob };
+export type NewPoster = { name: string; image: Blob; schedule?: PosterSchedule };
 
 export type DeviceRecord = {
   id: string;
@@ -111,7 +116,8 @@ export type Manifest = {
   storeName: string | null;
   deviceName: string | null;
   settings: DeviceSettings;
-  posters: Pick<PosterRecord, "id" | "name" | "imageUrl" | "durationSec">[];
+  /** 有効なポスター（スケジュールの判定は端末側で行う） */
+  posters: Pick<PosterRecord, "id" | "name" | "imageUrl" | "durationSec" | "schedule">[];
 };
 
 /** 店頭端末（サイネージ画面）用 */
