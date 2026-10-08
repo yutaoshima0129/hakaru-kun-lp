@@ -3,17 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import HourlyChart, { type HourRow } from "@/components/HourlyChart";
-import { demoMetrics } from "@/lib/samples";
-import {
-  clearMetrics,
-  hasDemoMetrics,
-  listMetrics,
-  listPosters,
-  putDemoMetrics,
-  subscribe,
-  type Poster,
-  type StoredMetric,
-} from "@/lib/store";
+import { useStore } from "@/components/AdminShell";
+import { getAdminBackend, mode, type DeviceRecord, type MetricRow, type PosterRecord } from "@/lib/backend";
+import { localDemo } from "@/lib/backend/local";
 
 const PERIODS = [
   { key: "today", label: "今日" },
@@ -36,27 +28,39 @@ const sec = (ms: number, viewers: number) => (viewers > 0 ? `${(ms / viewers / 1
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<PeriodKey>("today");
-  const [rows, setRows] = useState<StoredMetric[]>([]);
-  const [posters, setPosters] = useState<Poster[]>([]);
+  const { storeId } = useStore();
+  const [rows, setRows] = useState<MetricRow[]>([]);
+  const [posters, setPosters] = useState<PosterRecord[]>([]);
+  const [devices, setDevices] = useState<DeviceRecord[]>([]);
+  const [deviceId, setDeviceId] = useState("");
   const [hasDemo, setHasDemo] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
+    const backend = getAdminBackend();
     const [from, to] = periodRange(period);
-    const [m, p, d] = await Promise.all([listMetrics(from, to), listPosters(), hasDemoMetrics()]);
-    setRows(m);
-    setPosters(p);
-    setHasDemo(d);
+    try {
+      const [m, p, dv, d] = await Promise.all([
+        backend.listMetrics(storeId, from, to, deviceId || undefined),
+        backend.listPosters(storeId),
+        backend.listDevices(storeId),
+        mode === "local" ? localDemo.hasDemoData() : false,
+      ]);
+      setRows(m);
+      setPosters(p);
+      setDevices(dv);
+      setHasDemo(d);
+    } catch (e) {
+      console.error("ダッシュボードの読み込みに失敗", e);
+    }
     setLoaded(true);
-  }, [period]);
+  }, [storeId, period, deviceId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- IndexedDB からの読み込み
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- バックエンドからの読み込み
     load();
-    return subscribe((msg) => {
-      if (msg.type === "metrics-changed" || msg.type === "posters-changed") load();
-    });
-  }, [load]);
+    return getAdminBackend().subscribe(storeId, load);
+  }, [storeId, load]);
 
   const totals = useMemo(
     () =>
@@ -70,7 +74,7 @@ export default function Dashboard() {
   const hourly: HourRow[] = useMemo(() => {
     const out = Array.from({ length: 24 }, (_, hour) => ({ hour, passers: 0, viewers: 0, dwellMs: 0 }));
     for (const r of rows) {
-      const h = out[new Date(r.minute).getHours()];
+      const h = out[new Date(r.start).getHours()];
       h.passers += r.passers;
       h.viewers += r.viewers;
       h.dwellMs += r.dwellMs;
@@ -89,7 +93,7 @@ export default function Dashboard() {
     }
     const list = [...map.entries()].map(([id, v]) => {
       const p = posters.find((x) => x.id === id);
-      return { id, name: p?.name ?? "（削除済みのポスター）", image: p?.image, ...v, rate: v.passers ? v.viewers / v.passers : 0 };
+      return { id, name: p?.name ?? "（削除済みのポスター）", image: p?.imageUrl, ...v, rate: v.passers ? v.viewers / v.passers : 0 };
     });
     return list.sort((a, b) => b.rate - a.rate);
   }, [rows, posters]);
@@ -100,7 +104,7 @@ export default function Dashboard() {
       alert("先にポスターを追加してください（デモデータはポスターごとに作られます）。");
       return;
     }
-    await putDemoMetrics(demoMetrics(posters, 30));
+    await localDemo.addDemoData();
   };
 
   return (
@@ -122,13 +126,28 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+        {devices.length >= 2 && (
+          <select
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+            aria-label="端末で絞り込み"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+          >
+            <option value="">すべての端末</option>
+            {devices.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {hasDemo && (
+      {mode === "local" && hasDemo && (
         <div className="flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl px-4 py-3">
           <span className="font-bold">デモデータを表示中</span>
           <span>実測データと混ざっています。数値は架空です。</span>
-          <button onClick={() => clearMetrics(true)} className="ml-auto underline font-bold">
+          <button onClick={() => localDemo.clearDemoData()} className="ml-auto underline font-bold">
             デモデータを削除
           </button>
         </div>
@@ -203,17 +222,19 @@ export default function Dashboard() {
       </section>
 
       <div className="flex flex-wrap gap-3 text-sm">
-        {!hasDemo && (
+        {mode === "local" && !hasDemo && (
           <button onClick={addDemo} className="px-4 py-2 rounded-lg border border-gray-300 bg-white font-bold hover:bg-gray-50">
             デモデータを入れて見た目を確認（過去30日）
           </button>
         )}
+        {mode === "local" && (
         <button
-          onClick={() => confirm("すべての計測データを削除します。よろしいですか？") && clearMetrics(false)}
+          onClick={() => confirm("すべての計測データを削除します。よろしいですか？") && localDemo.clearAllMetrics()}
           className="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-bold"
         >
           計測データをすべて削除
         </button>
+        )}
       </div>
     </div>
   );
@@ -238,11 +259,15 @@ function Empty({ loaded, onDemo }: { loaded: boolean; onDemo: () => void }) {
         <Link href="/admin/posters" className="text-primary font-bold underline">
           ポスターを登録
         </Link>
-        してサイネージ画面を開くか、
-        <button onClick={onDemo} className="text-primary font-bold underline">
-          デモデータを入れて
-        </button>
-        確認してください。
+        してサイネージ画面を開く{mode === "local" ? "か、" : "と、ここに反映されます。"}
+        {mode === "local" && (
+          <>
+            <button onClick={onDemo} className="text-primary font-bold underline">
+              デモデータを入れて
+            </button>
+            確認してください。
+          </>
+        )}
       </p>
     </div>
   );

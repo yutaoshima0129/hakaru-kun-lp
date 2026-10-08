@@ -1,7 +1,8 @@
 // デモ用：サンプルポスターと、過去7日分の擬似計測データ
 
 import { bucketKey } from "./attention";
-import { newId, type Poster, type StoredMetric } from "./store";
+import type { NewPoster } from "./backend/types";
+import type { Poster, StoredMetric } from "./store";
 
 const FONT = `'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',Meiryo,sans-serif`;
 
@@ -21,9 +22,22 @@ function poster(bg1: string, bg2: string, accent: string, eyebrow: string, title
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export function samplePosters(startOrder: number): Poster[] {
-  const now = Date.now();
-  return [
+/** SVG の data URL を 1920×1080 の PNG に変換する（Storage は jpeg/png/webp のみ受け付けるため） */
+async function rasterize(svgUrl: string): Promise<Blob> {
+  const img = new Image();
+  img.src = svgUrl;
+  await img.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = 1920;
+  canvas.height = 1080;
+  canvas.getContext("2d")!.drawImage(img, 0, 0, 1920, 1080);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("画像を作れませんでした"))), "image/png"),
+  );
+}
+
+export function samplePosters(): Promise<NewPoster[]> {
+  const defs = [
     {
       name: "ランチ定食",
       image: poster("#7c2d12", "#c2410c", "#fde68a", "11:00〜14:00 限定", "日替わりランチ", "ご飯・味噌汁おかわり自由", "¥980"),
@@ -36,14 +50,8 @@ export function samplePosters(startOrder: number): Poster[] {
       name: "ハッピーアワー",
       image: poster("#0c4a6e", "#0369a1", "#fcd34d", "17:00〜19:00", "ハッピーアワー", "生ビール・ハイボール全品", "半額"),
     },
-  ].map((p, i) => ({
-    ...p,
-    id: newId(),
-    durationSec: 10,
-    enabled: true,
-    order: startOrder + i,
-    createdAt: now + i,
-  }));
+  ];
+  return Promise.all(defs.map(async (d) => ({ name: d.name, image: await rasterize(d.image) })));
 }
 
 /** 飲食店らしい時間帯の通行量（ランチ・ディナーにピーク） */
@@ -95,8 +103,8 @@ export function demoMetrics(posters: Poster[], days = 7): StoredMetric[] {
   return rows;
 }
 
-/** アップロード画像を最大 1920px の JPEG に縮小して data URL にする */
-export async function fileToPosterImage(file: File): Promise<string> {
+/** アップロード画像を最大 1920px の JPEG に縮小する */
+export async function fileToPosterImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1920 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
@@ -104,5 +112,7 @@ export async function fileToPosterImage(file: File): Promise<string> {
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  return canvas.toDataURL("image/jpeg", 0.9);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("画像を変換できませんでした"))), "image/jpeg", 0.9),
+  );
 }

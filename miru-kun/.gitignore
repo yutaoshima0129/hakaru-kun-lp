@@ -42,3 +42,4 @@ next-env.d.ts
 
 # MediaPipe WASM (postinstall でコピー)
 /public/mediapipe
+!.env.local.example

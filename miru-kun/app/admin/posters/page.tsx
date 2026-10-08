@@ -1,64 +1,93 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useStore } from "@/components/AdminShell";
+import { getAdminBackend, type NewPoster, type PosterPatch, type PosterRecord } from "@/lib/backend";
 import { fileToPosterImage, samplePosters } from "@/lib/samples";
-import { deletePoster, listPosters, newId, savePosters, subscribe, type Poster } from "@/lib/store";
 
 export default function PostersPage() {
-  const [posters, setPosters] = useState<Poster[]>([]);
+  const { storeId } = useStore();
+  const [posters, setPosters] = useState<PosterRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => setPosters(await listPosters()), []);
+  const load = useCallback(async () => {
+    try {
+      setPosters(await getAdminBackend().listPosters(storeId));
+    } catch (e) {
+      alert(`ポスターを読み込めませんでした：${(e as Error).message}`);
+    }
+  }, [storeId]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- IndexedDB からの読み込み
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- バックエンドからの読み込み
     load();
-    return subscribe((msg) => msg.type === "posters-changed" && load());
-  }, [load]);
+    return getAdminBackend().subscribe(storeId, load);
+  }, [storeId, load]);
 
-  const nextOrder = () => (posters.length ? Math.max(...posters.map((p) => p.order)) + 1 : 0);
-
-  const upload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const add = async (make: () => Promise<NewPoster[]>) => {
     setBusy(true);
     try {
-      const start = nextOrder();
-      const created: Poster[] = [];
-      for (const [i, file] of [...files].entries()) {
-        created.push({
-          id: newId(),
-          name: file.name.replace(/\.[^.]+$/, ""),
-          image: await fileToPosterImage(file),
-          durationSec: 10,
-          enabled: true,
-          order: start + i,
-          createdAt: Date.now() + i,
-        });
-      }
-      await savePosters(created);
+      await getAdminBackend().addPosters(storeId, await make());
+      await load();
     } catch (e) {
-      alert(`画像を読み込めませんでした：${(e as Error).message}`);
+      alert(`ポスターを追加できませんでした：${(e as Error).message}`);
     } finally {
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
-  const update = (p: Poster, patch: Partial<Poster>) => {
-    // 保存完了を待たずに画面へ反映する
-    setPosters((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
-    return savePosters([{ ...p, ...patch }]);
+  const upload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const list = [...files];
+    await add(async () =>
+      Promise.all(list.map(async (f) => ({ name: f.name.replace(/\.[^.]+$/, ""), image: await fileToPosterImage(f) }))),
+    );
+    if (fileRef.current) fileRef.current.value = "";
   };
 
-  const move = (i: number, dir: -1 | 1) => {
+  const update = async (p: PosterRecord, patch: PosterPatch) => {
+    // 保存完了を待たずに画面へ反映する
+    setPosters((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
+    try {
+      await getAdminBackend().updatePosters(storeId, [{ id: p.id, patch }]);
+    } catch (e) {
+      alert(`保存できませんでした：${(e as Error).message}`);
+      load();
+    }
+  };
+
+  const move = async (i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= posters.length) return;
     const a = posters[i];
     const b = posters[j];
-    savePosters([
-      { ...a, order: b.order },
-      { ...b, order: a.order === b.order ? a.order + dir : a.order },
-    ]);
+    const aOrder = b.order;
+    const bOrder = a.order === b.order ? a.order + dir : a.order;
+    setPosters((prev) =>
+      prev
+        .map((x) => (x.id === a.id ? { ...x, order: aOrder } : x.id === b.id ? { ...x, order: bOrder } : x))
+        .sort((x, y) => x.order - y.order || x.createdAt - y.createdAt),
+    );
+    try {
+      await getAdminBackend().updatePosters(storeId, [
+        { id: a.id, patch: { order: aOrder } },
+        { id: b.id, patch: { order: bOrder } },
+      ]);
+    } catch (e) {
+      alert(`並び替えできませんでした：${(e as Error).message}`);
+      load();
+    }
+  };
+
+  const remove = async (p: PosterRecord) => {
+    if (!confirm(`「${p.name}」を削除しますか？`)) return;
+    setPosters((prev) => prev.filter((x) => x.id !== p.id));
+    try {
+      await getAdminBackend().deletePoster(storeId, p.id);
+    } catch (e) {
+      alert(`削除できませんでした：${(e as Error).message}`);
+      load();
+    }
   };
 
   const totalSec = posters.filter((p) => p.enabled).reduce((s, p) => s + p.durationSec, 0);
@@ -73,8 +102,9 @@ export default function PostersPage() {
           </p>
         </div>
         <button
-          onClick={() => savePosters(samplePosters(nextOrder()))}
-          className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-bold hover:bg-gray-50"
+          onClick={() => add(samplePosters)}
+          disabled={busy}
+          className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-bold hover:bg-gray-50 disabled:opacity-50"
         >
           サンプルを追加
         </button>
@@ -113,7 +143,7 @@ export default function PostersPage() {
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.image} alt={p.name} className="w-full sm:w-56 aspect-video object-contain bg-black rounded-lg" />
+              <img src={p.imageUrl} alt={p.name} className="w-full sm:w-56 aspect-video object-contain bg-black rounded-lg" />
               <div className="flex-1 grid gap-3 sm:grid-cols-[1fr_auto] items-start">
                 <div className="space-y-3">
                   <label className="block">
@@ -160,7 +190,7 @@ export default function PostersPage() {
                   </IconButton>
                   <IconButton
                     label="削除"
-                    onClick={() => confirm(`「${p.name}」を削除しますか？`) && deletePoster(p.id)}
+                    onClick={() => remove(p)}
                     danger
                   >
                     ✕
