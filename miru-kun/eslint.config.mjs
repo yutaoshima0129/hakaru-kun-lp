@@ -12,8 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // 別アプリ（デジタルサイネージ試作）
-    "miru-kun/**",
+    // MediaPipe の WASM ランタイム（postinstall でコピー）
+    "public/mediapipe/**",
   ]),
 ]);
 
