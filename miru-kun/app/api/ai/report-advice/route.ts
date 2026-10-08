@@ -35,7 +35,14 @@ export async function POST(request: Request) {
   let summary: ReportSummary;
   try {
     summary = (await request.json()) as ReportSummary;
-    if (!summary?.thisWeek || !Array.isArray(summary.posters) || !Array.isArray(summary.hourly)) throw new Error();
+    if (
+      typeof summary?.storeName !== "string" ||
+      !summary.thisWeek ||
+      !summary.lastWeek ||
+      !Array.isArray(summary.posters) ||
+      !Array.isArray(summary.hourly)
+    )
+      throw new Error();
   } catch {
     return Response.json({ error: "集計データを読み取れませんでした" }, { status: 400 });
   }
@@ -49,7 +56,7 @@ export async function POST(request: Request) {
       system: SYSTEM,
       effort: "medium",
       schema: SCHEMA,
-      prompt: `以下は店舗「${String(summary.storeName).slice(0, 100)}」の計測データ（JSON）です。\n\n${JSON.stringify({
+      prompt: `以下は店舗「${summary.storeName.slice(0, 100)}」の計測データ（JSON）です。\n\n${JSON.stringify({
         period: summary.period,
         thisWeek: summary.thisWeek,
         lastWeek: summary.lastWeek,
@@ -57,7 +64,9 @@ export async function POST(request: Request) {
         posters: summary.posters,
       })}`,
     });
-    if (!isReportAdvice(result)) throw new AiError("分析結果を作れませんでした。もう一度お試しください");
+    if (!isReportAdvice(result) || result.actions.length === 0) {
+      throw new AiError("分析結果を作れませんでした。もう一度お試しください");
+    }
     return Response.json({ ...result, actions: result.actions.slice(0, 3) } satisfies ReportAdvice);
   } catch (e) {
     return handleAiError(e);
