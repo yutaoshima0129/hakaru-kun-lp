@@ -94,13 +94,19 @@ export type Track = {
   countedPasser: boolean;
   countedViewer: boolean;
   totalLookMs: number;
+  /** 通行として数えた時に表示中だったポスター（注視もこのポスターに計上する） */
+  posterId: string | null;
 };
 
-/** 計測イベント。呼び出し側がその時点で表示中のポスターに紐付けて集計する */
+/**
+ * 計測イベント。posterId は計上先のポスター（表示中のものが無ければ null）。
+ * 1人の通行と注視は必ず同じポスターに計上する（途中でポスターが切り替わっても注視率が100%を超えないように）。
+ * 注視時間は「見ていたその瞬間に表示されていた」ポスターに計上する。
+ */
 export type AttentionEvent =
-  | { type: "passer"; at: number }
-  | { type: "viewer"; at: number }
-  | { type: "dwell"; at: number; ms: number };
+  | { type: "passer"; at: number; posterId: string | null }
+  | { type: "viewer"; at: number; posterId: string | null }
+  | { type: "dwell"; at: number; ms: number; posterId: string | null };
 
 export type TrackerOptions = {
   /** この時間見えなくなったらトラックを破棄（ms） */
@@ -131,8 +137,13 @@ export class AttentionTracker {
     return this.tracks;
   }
 
-  /** 1フレーム分の検出結果を渡し、発生したイベントを返す */
-  update(faces: FaceObservation[], now: number, s: AttentionSettings): AttentionEvent[] {
+  /** 1フレーム分の検出結果と、いま表示中のポスターを渡し、発生したイベントを返す */
+  update(
+    faces: FaceObservation[],
+    now: number,
+    s: AttentionSettings,
+    currentPosterId: string | null = null,
+  ): AttentionEvent[] {
     const events: AttentionEvent[] = [];
     const frameMs =
       this.lastUpdate === null ? 0 : Math.min(now - this.lastUpdate, this.opts.maxFrameMs);
@@ -169,12 +180,13 @@ export class AttentionTracker {
           countedPasser: false,
           countedViewer: false,
           totalLookMs: 0,
+          posterId: null,
         };
         this.tracks.push(track);
       } else if (track.looking) {
         // 前フレームから向いていた分を注視時間として加算
         track.totalLookMs += frameMs;
-        events.push({ type: "dwell", at: now, ms: frameMs });
+        events.push({ type: "dwell", at: now, ms: frameMs, posterId: currentPosterId });
       }
       track.cx = face.cx;
       track.cy = face.cy;
@@ -185,22 +197,21 @@ export class AttentionTracker {
       if (!looking) track.lookStart = null;
       track.looking = looking;
 
-      if (!track.countedPasser && now - track.firstSeen >= s.minPresenceMs) {
+      const countPasser = () => {
         track.countedPasser = true;
-        events.push({ type: "passer", at: now });
-      }
+        track.posterId = currentPosterId;
+        events.push({ type: "passer", at: now, posterId: currentPosterId });
+      };
+      if (!track.countedPasser && now - track.firstSeen >= s.minPresenceMs) countPasser();
       if (
         !track.countedViewer &&
         track.lookStart !== null &&
         now - track.lookStart >= s.minLookMs
       ) {
         // 通行より先に注視が確定することはないように揃える
-        if (!track.countedPasser) {
-          track.countedPasser = true;
-          events.push({ type: "passer", at: now });
-        }
+        if (!track.countedPasser) countPasser();
         track.countedViewer = true;
-        events.push({ type: "viewer", at: now });
+        events.push({ type: "viewer", at: now, posterId: track.posterId });
       }
     });
 
@@ -243,7 +254,10 @@ export function bucketKey(minute: number, posterId: string) {
 export class MetricAggregator {
   private buckets = new Map<string, MetricBucket>();
 
-  add(event: AttentionEvent, posterId: string, epochMs: number) {
+  /** posterId が無い（ポスター未表示中の）イベントは捨てる */
+  add(event: AttentionEvent, epochMs: number) {
+    const posterId = event.posterId;
+    if (!posterId) return;
     const minute = minuteOf(epochMs);
     const key = bucketKey(minute, posterId);
     let b = this.buckets.get(key);

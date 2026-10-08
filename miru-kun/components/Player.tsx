@@ -186,12 +186,11 @@ export default function Player() {
         });
         lastFacesRef.current = faces;
 
-        const events = tracker.update(faces, now, s);
-        const posterId = currentPosterIdRef.current;
+        const events = tracker.update(faces, now, s, currentPosterIdRef.current);
         for (const ev of events) {
           if (ev.type === "passer") counts.passers++;
           if (ev.type === "viewer") counts.viewers++;
-          if (posterId) aggregator.add(ev, posterId, Date.now());
+          aggregator.add(ev, Date.now());
         }
 
         frameTimes.push(now);

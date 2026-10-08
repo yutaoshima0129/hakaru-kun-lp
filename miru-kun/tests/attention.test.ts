@@ -99,11 +99,12 @@ test("一瞬の検出漏れでは別人にならない", () => {
 
 test("集計はポスター・分単位でまとまる", () => {
   const agg = new MetricAggregator();
-  agg.add({ type: "passer", at: 0 }, "a", 60_000);
-  agg.add({ type: "viewer", at: 0 }, "a", 60_500);
-  agg.add({ type: "dwell", at: 0, ms: 300 }, "a", 61_000);
-  agg.add({ type: "passer", at: 0 }, "b", 61_000);
-  agg.add({ type: "passer", at: 0 }, "a", 125_000);
+  agg.add({ type: "passer", at: 0, posterId: "a" }, 60_000);
+  agg.add({ type: "viewer", at: 0, posterId: "a" }, 60_500);
+  agg.add({ type: "dwell", at: 0, ms: 300, posterId: "a" }, 61_000);
+  agg.add({ type: "passer", at: 0, posterId: "b" }, 61_000);
+  agg.add({ type: "passer", at: 0, posterId: "a" }, 125_000);
+  agg.add({ type: "passer", at: 0, posterId: null }, 61_000); // ポスター未表示中は捨てる
   const out = agg.drain().sort((x, y) => x.minute - y.minute || x.posterId.localeCompare(y.posterId));
   assert.deepEqual(out, [
     { minute: 60_000, posterId: "a", passers: 1, viewers: 1, dwellMs: 300 },
@@ -111,4 +112,20 @@ test("集計はポスター・分単位でまとまる", () => {
     { minute: 120_000, posterId: "a", passers: 1, viewers: 0, dwellMs: 0 },
   ]);
   assert.equal(agg.drain().length, 0);
+});
+
+test("見ている途中でポスターが切り替わっても、通行と注視は同じポスターに計上する", () => {
+  const tr = new AttentionTracker();
+  const events = [];
+  // 0〜300ms は横向きで通行が確定（ポスターA表示中）→ 400ms からBに切り替わり、その後正面を見る
+  for (let t = 0; t <= 1200; t += 100) {
+    const poster = t < 400 ? "A" : "B";
+    events.push(...tr.update([face(0.5, t < 400 ? 60 : 0)], t, settings, poster));
+  }
+  const passer = events.find((e) => e.type === "passer");
+  const viewer = events.find((e) => e.type === "viewer");
+  assert.equal(passer?.posterId, "A");
+  assert.equal(viewer?.posterId, "A", "注視は通行と同じポスターに計上");
+  // 注視時間は実際に表示されていたポスター（B）に計上
+  assert.ok(events.filter((e) => e.type === "dwell").every((e) => e.posterId === "B"));
 });
