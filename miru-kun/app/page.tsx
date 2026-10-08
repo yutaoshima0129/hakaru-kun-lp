@@ -35,6 +35,12 @@ export default function Home() {
           </Link>
         </div>
 
+        <p className="mt-4 text-sm">
+          <Link href="/check" className="text-primary font-bold hover:underline">
+            導入前のパソコン適合チェック →
+          </Link>
+        </p>
+
         <ol className="mt-8 text-sm text-gray-600 space-y-1 list-decimal list-inside">
           {mode === "cloud" ? (
             <>
