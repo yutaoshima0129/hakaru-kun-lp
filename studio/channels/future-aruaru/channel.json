@@ -1,7 +1,7 @@
 {
   "name": "未来なのに、まだこれ",
   "id": "future-aruaru",
-  "concept": "近未来(2060年ごろ)の生活で、技術が進んでも変わらない『あるある』を笑いに変える短編ショート。",
+  "concept": "近未来(2060年ごろ)の生活で、技術が進んでも変わらない『あるある』を笑いに変える、1本完結の短編ショート。",
   "tone": "軽いツッコミ口調。説教しない。オチは最後の1文で落とす。毎回『未来なのに、まだ○○』の型を使うが、題材・展開・オチは毎回変える。",
   "world": {
     "year": 2060,
@@ -16,8 +16,8 @@
     {
       "id": "mirai",
       "name": "ミライさん",
-      "role": "主人公。30代の会社員。うっかり者でツッコミ役",
-      "look": "short black hair, round glasses, light gray jacket with a yellow scarf, friendly tired expression"
+      "role": "主人公(男性)。30代の会社員。うっかり者でツッコミ役。毎話の主役",
+      "look": "a man in his 30s, short black hair, round glasses, light gray jacket with a yellow scarf, friendly tired expression"
     },
     {
       "id": "pon",
@@ -42,5 +42,13 @@
     "ai_disclosure": "アニメ調に固定。写実的な人物・実在の場所は描かない(YouTubeのAI開示は不要の範囲に収める)",
     "bgm": "原則なし、または商用可で収益に影響しない素材のみ。使用時は出典を記録する",
     "fact_check": "創作なので出典は不要。ただし実在の技術・制度に触れる場合は事実確認する"
+  },
+  "format": {
+    "type": "standalone_short",
+    "rules": [
+      "1本で完結する短編。前回・次回につなげない(前提知識なしで楽しめる)",
+      "構成は『フック → 状況 → 悪化 → オチ』を基本に、毎回オチの種類を変える",
+      "世界観(2060年・ミライ市)は共通でも、場所・状況・設定は毎回変えてよい"
+    ]
   }
 }
