@@ -3,6 +3,8 @@
 
 使い方:
   python3 studio/tools/studio.py prompts studio/projects/ep001
+  python3 studio/tools/studio.py narration studio/projects/ep001
+  python3 studio/tools/studio.py check   studio/projects/ep001
   python3 studio/tools/studio.py render  studio/projects/ep001 [--placeholder]
 
 必要なもの: Python 3.9+, Pillow, ffmpeg/ffprobe(libx264)。
@@ -82,6 +84,38 @@ def cmd_prompts(project: Path):
     out = project / "prompts.md"
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"書き出しました: {out}")
+
+
+# ---------------------------------------------------------------- narration / check
+def cmd_narration(project: Path):
+    script, _ = load(project)
+    lines = [f"# ナレーション: {script['title']}", "",
+             "VOICEVOXに1行ずつ貼り付けて、各行を音声ファイルとして書き出します。",
+             "書き出したら、ファイル名を s1.wav, s2.wav ... に直して audio/ に置いてください。", ""]
+    for s in script["scenes"]:
+        lines.append(f"s{s['id']}.wav: {s['narration']}")
+    out = project / "narration.txt"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"書き出しました: {out}")
+
+
+def cmd_check(project: Path):
+    script, _ = load(project)
+    ok = True
+    for s in script["scenes"]:
+        sid = s["id"]
+        img = project / "images" / f"s{sid}.png"
+        wav = project / "audio" / f"s{sid}.wav"
+        im = "OK" if img.exists() else "なし"
+        if img.exists():
+            w, h = Image.open(img).size
+            im += f" ({w}x{h})"
+        au = "なし"
+        if wav.exists():
+            au = f"OK ({audio_duration(wav):.1f}秒)"
+        print(f"シーン{sid}: 画像 {im} / 音声 {au}")
+        ok = ok and img.exists() and wav.exists()
+    print("\n準備完了です。render を実行できます。" if ok else "\n足りない素材があります(画像なしは --placeholder、音声なしは無音で作れます)。")
 
 
 # ---------------------------------------------------------------- render
@@ -208,12 +242,20 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p1 = sub.add_parser("prompts", help="画像プロンプトを prompts.md に書き出す")
     p1.add_argument("project", type=Path)
+    p3 = sub.add_parser("narration", help="VOICEVOX用のナレーション一覧を narration.txt に書き出す")
+    p3.add_argument("project", type=Path)
+    p4 = sub.add_parser("check", help="画像・音声の素材がそろっているか確認する")
+    p4.add_argument("project", type=Path)
     p2 = sub.add_parser("render", help="動画を組み立てる")
     p2.add_argument("project", type=Path)
     p2.add_argument("--placeholder", action="store_true", help="画像が無いシーンは仮画像で作る")
     a = ap.parse_args()
     if a.cmd == "prompts":
         cmd_prompts(a.project)
+    elif a.cmd == "narration":
+        cmd_narration(a.project)
+    elif a.cmd == "check":
+        cmd_check(a.project)
     else:
         cmd_render(a.project, a.placeholder)
 
