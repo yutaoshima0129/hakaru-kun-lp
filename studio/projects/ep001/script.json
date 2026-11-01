@@ -1,0 +1,60 @@
+{
+  "id": "ep001",
+  "channel": "future-aruaru",
+  "title": "2060年、空飛ぶ車が普及した結果…",
+  "theme": "未来なのに、まだ渋滞",
+  "unique_angle": "空の渋滞は『上下に重なる』ので地上より悪化する、という逆転のオチ。",
+  "hook": "2060年。空飛ぶ車が普及して、渋滞はなくなりました。…と思いますよね?",
+  "disclosure": { "ai_disclosure_required": false, "reason": "アニメ調・創作" },
+  "scenes": [
+    {
+      "id": 1,
+      "sec": 4,
+      "camera": "zoom_in",
+      "narration": "2060年。空飛ぶ車が普及して、渋滞はなくなりました。",
+      "subtitle": ["2060年。", "空飛ぶ車が普及して", "渋滞は消えた…"],
+      "image_prompt": "Mirai-san driving a small flying car high above a bright futuristic city, smiling confidently, blue sky, other flying cars far away"
+    },
+    {
+      "id": 2,
+      "sec": 4,
+      "camera": "zoom_out",
+      "narration": "…と思いますよね? 実は、渋滞は空に引っ越しただけでした。",
+      "subtitle": ["…と思いますよね?", "実は渋滞は", "空に引っ越しただけ"],
+      "image_prompt": "Mirai-san surprised, the sky around is packed with flying cars in several layers, a huge traffic jam in the sky, wide view of the futuristic city"
+    },
+    {
+      "id": 3,
+      "sec": 5,
+      "camera": "pan_right",
+      "narration": "しかも空は、上にも下にも車線がある。つまり、渋滞も立体的です。",
+      "subtitle": ["しかも空は", "上にも下にも車線がある", "渋滞も立体的"],
+      "image_prompt": "cross-section view of a sky traffic jam with cars stacked in many lanes at different heights, Mirai-san in the middle lane looking tired"
+    },
+    {
+      "id": 4,
+      "sec": 5,
+      "camera": "zoom_in",
+      "narration": "ポンが言います。『現在、あなたの上に二百台、下に三百台です』。",
+      "subtitle": ["ポン『現在、あなたの上に", "二百台、下に三百台です』"],
+      "image_prompt": "small white round robot Pon with a blue single-eye screen floating in the car, speaking calmly, Mirai-san next to it with a blank stare"
+    },
+    {
+      "id": 5,
+      "sec": 5,
+      "camera": "pan_left",
+      "narration": "そして、到着予定時刻は『おおむね、今日中』。",
+      "subtitle": ["到着予定時刻は", "『おおむね、今日中』"],
+      "image_prompt": "car dashboard screen showing a vague arrival time, represented only as a glowing blue symbol without readable text, Mirai-san slumped over the steering wheel"
+    },
+    {
+      "id": 6,
+      "sec": 5,
+      "camera": "zoom_out",
+      "narration": "未来になっても、人は結局、渋滞でラジオを聴いています。",
+      "subtitle": ["未来になっても", "人は結局", "渋滞でラジオを聴く"],
+      "image_prompt": "Mirai-san relaxed in the flying car holding a small retro radio, sunset sky full of flying cars, warm orange light, comedic resigned smile"
+    }
+  ],
+  "description_template": "未来なのに、まだこれ。2060年のあるある。\n\n#未来 #あるある #SF #Shorts"
+}

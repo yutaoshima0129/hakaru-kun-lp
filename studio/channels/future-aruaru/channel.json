@@ -1,0 +1,46 @@
+{
+  "name": "未来なのに、まだこれ",
+  "id": "future-aruaru",
+  "concept": "近未来(2060年ごろ)の生活で、技術が進んでも変わらない『あるある』を笑いに変える短編ショート。",
+  "tone": "軽いツッコミ口調。説教しない。オチは最後の1文で落とす。毎回『未来なのに、まだ○○』の型を使うが、題材・展開・オチは毎回変える。",
+  "world": {
+    "year": 2060,
+    "city": "ミライ市",
+    "rules": [
+      "空飛ぶ車、全自動の家、AIアシスタントは普及している",
+      "それでも人間の面倒くささ・手続き・見栄・うっかりは変わらない",
+      "実在の企業名・商品名・人物名は出さない"
+    ]
+  },
+  "characters": [
+    {
+      "id": "mirai",
+      "name": "ミライさん",
+      "role": "主人公。30代の会社員。うっかり者でツッコミ役",
+      "look": "short black hair, round glasses, light gray jacket with a yellow scarf, friendly tired expression"
+    },
+    {
+      "id": "pon",
+      "name": "ポン",
+      "role": "家庭用AIロボ。丁寧だが空気を読まない",
+      "look": "small white round robot with a blue single-eye screen, tiny arms, floating slightly above the ground"
+    }
+  ],
+  "visual_style": {
+    "base_prompt": "anime style, clean line art, soft cel shading, bright pastel colors, near-future city, vertical 9:16 composition, subject centered, leave empty space at the bottom 25% for subtitles, no text, no logos, no watermark",
+    "aspect": "9:16",
+    "realistic_people": false
+  },
+  "voice": {
+    "engine": "VOICEVOX",
+    "speakers": {
+      "narrator": "TBD(使用キャラの個別規約を確認してから決定)"
+    },
+    "credit_template": "VOICEVOX:{speaker}"
+  },
+  "compliance": {
+    "ai_disclosure": "アニメ調に固定。写実的な人物・実在の場所は描かない(YouTubeのAI開示は不要の範囲に収める)",
+    "bgm": "原則なし、または商用可で収益に影響しない素材のみ。使用時は出典を記録する",
+    "fact_check": "創作なので出典は不要。ただし実在の技術・制度に触れる場合は事実確認する"
+  }
+}
